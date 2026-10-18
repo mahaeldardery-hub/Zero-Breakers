@@ -1,0 +1,1003 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ZERO BREAKERS - The Regrouping Quest</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- React & ReactDOM -->
+    <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    <!-- Babel for JSX -->
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Outfit:wght@400;600;800&family=Space+Grotesk:wght@500;700&display=swap');
+
+        :root {
+            --bg-dark: #0f172a;
+            --panel-bg: #1e293b;
+            --accent-cyan: #06b6d4;
+            --accent-orange: #f97316;
+            --accent-green: #22c55e;
+            --text-main: #f8fafc;
+        }
+
+        body {
+            font-family: 'Outfit', sans-serif;
+            background-color: var(--bg-dark);
+            color: var(--text-main);
+            overflow-x: hidden;
+            margin: 0;
+            padding: 0;
+            /* Prevent bounce scrolling on mobile */
+            overscroll-behavior-y: none; 
+        }
+
+        h1, h2, h3, .display-font {
+            font-family: 'Space Grotesk', sans-serif;
+        }
+
+        /* Custom Scrollbar */
+        ::-webkit-scrollbar { width: 8px; }
+        ::-webkit-scrollbar-track { background: var(--bg-dark); }
+        ::-webkit-scrollbar-thumb { background: #475569; border-radius: 4px; }
+        ::-webkit-scrollbar-thumb:hover { background: #64748b; }
+
+        /* Strikethrough animation for regrouping */
+        .strike-anim {
+            position: relative;
+            display: inline-block;
+        }
+        .strike-anim::after {
+            content: '';
+            position: absolute;
+            top: 50%;
+            left: -10%;
+            width: 120%;
+            height: 2px;
+            background: #ef4444;
+            transform: rotate(-15deg);
+            animation: strike 0.3s ease-out forwards;
+        }
+        @keyframes strike {
+            0% { width: 0; opacity: 0; }
+            100% { width: 120%; opacity: 1; }
+        }
+
+        /* Float animation for XP */
+        @keyframes floatUp {
+            0% { opacity: 1; transform: translateY(0) scale(1); }
+            100% { opacity: 0; transform: translateY(-40px) scale(1.5); }
+        }
+        .xp-pop {
+            animation: floatUp 1.2s ease-out forwards;
+            position: absolute;
+            pointer-events: none;
+            color: #fbbf24;
+            font-weight: bold;
+            text-shadow: 0 2px 4px rgba(0,0,0,0.5);
+            z-index: 50;
+        }
+
+        /* Block animations */
+        .block-appear {
+            animation: popIn 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
+        }
+        @keyframes popIn {
+            0% { transform: scale(0); opacity: 0; }
+            100% { transform: scale(1); opacity: 1; }
+        }
+
+        /* Pulse for hints */
+        .hint-pulse {
+            animation: pulseHint 2s infinite;
+        }
+        @keyframes pulseHint {
+            0% { box-shadow: 0 0 0 0 rgba(6, 182, 212, 0.7); }
+            70% { box-shadow: 0 0 0 10px rgba(6, 182, 212, 0); }
+            100% { box-shadow: 0 0 0 0 rgba(6, 182, 212, 0); }
+        }
+
+        /* Print Styles for Certificate */
+        @media print {
+            body * { visibility: hidden; }
+            #certificate-area, #certificate-area * { visibility: visible; }
+            #certificate-area {
+                position: absolute;
+                left: 0;
+                top: 0;
+                width: 100%;
+                height: 100vh;
+                margin: 0;
+                padding: 0;
+                background: white !important;
+            }
+            .no-print { display: none !important; }
+            @page { size: landscape; margin: 0; }
+        }
+        
+        /* Map Path Dashes */
+        .path-dash {
+            stroke-dasharray: 10;
+            animation: dash 20s linear infinite;
+        }
+        @keyframes dash {
+            to { stroke-dashoffset: -1000; }
+        }
+    </style>
+</head>
+<body>
+    <div id="root"></div>
+
+    <script type="text/babel">
+        const { useState, useEffect, useRef, useMemo } = React;
+
+        const LEVELS = [
+            { id: 'training', title: 'Training Lab', desc: 'Unlock the Regrouping Machine' },
+            { id: 'level1', title: 'Break the Zero', desc: 'Repair the Place-Value Power Station' },
+            { id: 'level2', title: 'Zero Chain', desc: 'Cross the Zero Bridge' },
+            { id: 'level3', title: 'Algorithm Arena', desc: 'Activate the Subtraction Engine' },
+            { id: 'level4', title: 'Error Hunters', desc: 'Catch the Glitch' },
+            { id: 'level5', title: 'Strategy Masters', desc: 'Choose the Strongest Strategy' },
+            { id: 'level6', title: 'The Zero Vault', desc: 'Final Boss Challenge' }
+        ];
+
+        const ICONS = {
+            lock: <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"></path></svg>,
+            check: <svg className="w-6 h-6 text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7"></path></svg>,
+            star: <svg className="w-5 h-5 text-yellow-400 fill-current" viewBox="0 0 20 20"><path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z"></path></svg>,
+            arrowRight: <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M14 5l7 7m0 0l-7 7m7-7H3"></path></svg>,
+            undo: <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6"></path></svg>,
+            refresh: <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path></svg>
+        };
+
+        const BlockVisuals = {
+            One: () => <svg className="w-4 h-4 text-cyan-400 block-appear" viewBox="0 0 20 20" fill="currentColor"><rect x="2" y="2" width="16" height="16" rx="2" stroke="white" strokeWidth="1"/></svg>,
+            Ten: () => <svg className="w-4 h-16 text-emerald-400 block-appear" viewBox="0 0 20 80" fill="currentColor"><rect x="2" y="2" width="16" height="76" rx="2" stroke="white" strokeWidth="1"/><line x1="2" y1="9.5" x2="18" y2="9.5" stroke="white" strokeWidth="1"/><line x1="2" y1="17" x2="18" y2="17" stroke="white" strokeWidth="1"/><line x1="2" y1="24.5" x2="18" y2="24.5" stroke="white" strokeWidth="1"/><line x1="2" y1="32" x2="18" y2="32" stroke="white" strokeWidth="1"/><line x1="2" y1="39.5" x2="18" y2="39.5" stroke="white" strokeWidth="1"/><line x1="2" y1="47" x2="18" y2="47" stroke="white" strokeWidth="1"/><line x1="2" y1="54.5" x2="18" y2="54.5" stroke="white" strokeWidth="1"/><line x1="2" y1="62" x2="18" y2="62" stroke="white" strokeWidth="1"/><line x1="2" y1="69.5" x2="18" y2="69.5" stroke="white" strokeWidth="1"/></svg>,
+            Hundred: () => <svg className="w-16 h-16 text-orange-400 block-appear" viewBox="0 0 80 80" fill="currentColor"><rect x="2" y="2" width="76" height="76" rx="2" stroke="white" strokeWidth="1"/><path d="M9.5 2 v76 M17 2 v76 M24.5 2 v76 M32 2 v76 M39.5 2 v76 M47 2 v76 M54.5 2 v76 M62 2 v76 M69.5 2 v76" stroke="white" strokeWidth="0.5"/><path d="M2 9.5 h76 M2 17 h76 M2 24.5 h76 M2 32 h76 M2 39.5 h76 M2 47 h76 M2 54.5 h76 M2 62 h76 M2 69.5 h76" stroke="white" strokeWidth="0.5"/></svg>,
+            Thousand: () => <svg className="w-20 h-20 text-purple-400 block-appear" viewBox="0 0 100 100" fill="currentColor"><polygon points="20,80 80,80 100,60 100,0 40,0 20,20" stroke="white" strokeWidth="1"/><polygon points="20,20 80,20 100,0" stroke="white" strokeWidth="1" fill="none"/><line x1="80" y1="80" x2="80" y2="20" stroke="white" strokeWidth="1"/><text x="45" y="55" fill="white" fontSize="20" fontWeight="bold">1000</text></svg>,
+            TenThousand: () => <svg className="w-24 h-24 text-pink-500 block-appear" viewBox="0 0 120 120" fill="currentColor"><rect x="10" y="10" width="100" height="100" rx="8" stroke="white" strokeWidth="2"/><text x="25" y="65" fill="white" fontSize="24" fontWeight="bold">10,000</text></svg>
+        };
+
+        const ZeroX = ({ emotion = 'normal', size = 'normal' }) => {
+            const dims = size === 'small' ? 'w-12 h-12' : 'w-24 h-24';
+            return (
+                <div className={`relative ${dims} flex-shrink-0 bg-slate-800 rounded-2xl border-4 border-cyan-500 shadow-[0_0_15px_rgba(6,182,212,0.5)] overflow-hidden flex flex-col items-center justify-center`}>
+                    <div className="absolute top-0 w-full h-2 bg-slate-700"></div>
+                    <div className="flex gap-2 mb-2">
+                        {/* Eyes */}
+                        <div className={`w-3 h-3 rounded-full bg-cyan-400 ${emotion==='happy'?'animate-bounce':''} shadow-[0_0_8px_#22d3ee]`}></div>
+                        <div className={`w-3 h-3 rounded-full bg-cyan-400 ${emotion==='happy'?'animate-bounce':''} shadow-[0_0_8px_#22d3ee]`}></div>
+                    </div>
+                    {/* Mouth */}
+                    {emotion === 'happy' && <div className="w-8 h-3 border-b-2 border-cyan-400 rounded-b-full"></div>}
+                    {emotion === 'normal' && <div className="w-6 h-1 bg-cyan-400 rounded-full"></div>}
+                    {emotion === 'thinking' && <div className="w-4 h-4 border-2 border-cyan-400 rounded-full animate-pulse"></div>}
+                    {emotion === 'shock' && <div className="w-4 h-4 border-2 border-orange-400 rounded-full"></div>}
+                </div>
+            );
+        };
+
+        // Helper to convert number to array of digits, padded to a certain length
+        const getDigits = (num, length) => {
+            const str = num.toString().padStart(length, '0');
+            return str.split('').map(Number);
+        };
+
+        const PLACE_NAMES = ['Ten Thousands', 'Thousands', 'Hundreds', 'Tens', 'Ones'];
+        const PLACE_VALUES = [10000, 1000, 100, 10, 1];
+
+        const createInitialState = (minuend, subtrahend) => {
+            const len = Math.max(minuend.toString().length, subtrahend.toString().length);
+            const mDigits = getDigits(minuend, len);
+            const sDigits = getDigits(subtrahend, len);
+            
+            // Generate columns from right to left (Ones, Tens, etc.) then reverse to display left to right
+            const columns = mDigits.map((val, i) => {
+                const placeIndex = 5 - len + i; // Map to Ten Thousands, etc.
+                return {
+                    id: `col-${i}`,
+                    name: PLACE_NAMES[placeIndex],
+                    value: PLACE_VALUES[placeIndex],
+                    topHistory: [val], // History of values in the top row (for strike-through)
+                    subtrahend: sDigits[i],
+                    userInput: ''
+                };
+            });
+            return columns;
+        };
+
+        const SubtractionWorkspace = ({ 
+            minuend, 
+            subtrahend, 
+            mode = 'model', // 'model' (shows blocks), 'algorithm' (just numbers), 'mixed'
+            onSolve, 
+            showHint = false,
+            hintMessage = '',
+            readOnly = false
+        }) => {
+            const [columns, setColumns] = useState(() => createInitialState(minuend, subtrahend));
+            const [feedback, setFeedback] = useState(null);
+            const [history, setHistory] = useState([createInitialState(minuend, subtrahend)]);
+
+            // Reset when props change
+            useEffect(() => {
+                const init = createInitialState(minuend, subtrahend);
+                setColumns(init);
+                setHistory([init]);
+                setFeedback(null);
+            }, [minuend, subtrahend]);
+
+            const handleRegroup = (fromIndex) => {
+                if (readOnly) return;
+                const toIndex = fromIndex + 1;
+                if (toIndex >= columns.length) return;
+
+                const newCols = JSON.parse(JSON.stringify(columns)); // Deep copy
+                const fromCol = newCols[fromIndex];
+                const toCol = newCols[toIndex];
+
+                const currentFromVal = fromCol.topHistory[fromCol.topHistory.length - 1];
+                const currentToVal = toCol.topHistory[toCol.topHistory.length - 1];
+
+                if (currentFromVal === 0) {
+                    setFeedback({ type: 'error', msg: `Cannot regroup from ${fromCol.name} because it has 0 units. You need to regroup from a greater place first.` });
+                    return;
+                }
+
+                // Perform exchange mathematically: 1 large unit = 10 smaller units
+                fromCol.topHistory.push(currentFromVal - 1);
+                toCol.topHistory.push(currentToVal + 10);
+
+                setColumns(newCols);
+                setHistory([...history, newCols]);
+                setFeedback({ type: 'success', msg: `Exchanged 1 ${fromCol.name.slice(0,-1)} for 10 ${toCol.name}. Total value remains the same.` });
+            };
+
+            const handleUndo = () => {
+                if (readOnly || history.length <= 1) return;
+                const newHistory = history.slice(0, -1);
+                setHistory(newHistory);
+                setColumns(newHistory[newHistory.length - 1]);
+                setFeedback(null);
+            };
+
+            const handleReset = () => {
+                if (readOnly) return;
+                const init = createInitialState(minuend, subtrahend);
+                setColumns(init);
+                setHistory([init]);
+                setFeedback(null);
+            };
+
+            const handleInputChange = (index, val) => {
+                if (readOnly) return;
+                const newCols = [...columns];
+                newCols[index].userInput = val;
+                setColumns(newCols);
+            };
+
+            const checkAnswer = () => {
+                if (readOnly) return;
+                // Check if bottom row is fully filled
+                if (columns.some(c => c.userInput === '')) {
+                    setFeedback({ type: 'error', msg: "Complete the subtraction in all columns." });
+                    return;
+                }
+
+                const expectedAnswer = minuend - subtrahend;
+                const studentAnswerStr = columns.map(c => c.userInput).join('');
+                const studentAnswerNum = parseInt(studentAnswerStr, 10);
+
+                if (studentAnswerNum === expectedAnswer) {
+                    // It's numerically correct, but did they regroup properly?
+                    // Programmatic check: did they *need* to regroup?
+                    let validRegrouping = true;
+                    let logicError = "";
+
+                    // Re-calculate expected top row to verify logic
+                    let tempMin = getDigits(minuend, columns.length);
+                    let tempSub = getDigits(subtrahend, columns.length);
+                    
+                    for (let i = columns.length - 1; i >= 0; i--) {
+                        let finalTopVal = columns[i].topHistory[columns[i].topHistory.length - 1];
+                        if (finalTopVal < tempSub[i]) {
+                            validRegrouping = false;
+                            logicError = `In the ${columns[i].name} column, you tried to subtract ${tempSub[i]} from ${finalTopVal}. You must regroup first!`;
+                            break;
+                        }
+                    }
+
+                    if (validRegrouping) {
+                        setFeedback({ type: 'success', msg: "Mathematically correct! Excellent regrouping." });
+                        setTimeout(() => onSolve(true), 1500);
+                    } else {
+                        setFeedback({ type: 'error', msg: logicError || "Answer is correct, but your regrouping steps above are missing or incorrect." });
+                    }
+                } else {
+                    // Find first error from right to left
+                    for (let i = columns.length - 1; i >= 0; i--) {
+                        let finalTopVal = columns[i].topHistory[columns[i].topHistory.length - 1];
+                        let subVal = columns[i].subtrahend;
+                        let expectedDiff = finalTopVal - subVal;
+                        
+                        if (parseInt(columns[i].userInput, 10) !== expectedDiff) {
+                            if (finalTopVal < subVal) {
+                                setFeedback({ type: 'error', msg: `Look at the ${columns[i].name} column. You have ${finalTopVal} but need to subtract ${subVal}. You need to regroup!` });
+                            } else {
+                                setFeedback({ type: 'error', msg: `Check your subtraction in the ${columns[i].name} column: ${finalTopVal} - ${subVal} is not ${columns[i].userInput}.` });
+                            }
+                            return;
+                        }
+                    }
+                    setFeedback({ type: 'error', msg: "Something went wrong. Check your steps." });
+                }
+            };
+
+            const renderBlocks = (col, index) => {
+                const currentVal = col.topHistory[col.topHistory.length - 1];
+                let BlockComponent = BlockVisuals.One;
+                if (col.name === 'Tens') BlockComponent = BlockVisuals.Ten;
+                if (col.name === 'Hundreds') BlockComponent = BlockVisuals.Hundred;
+                if (col.name === 'Thousands') BlockComponent = BlockVisuals.Thousand;
+                if (col.name === 'Ten Thousands') BlockComponent = BlockVisuals.TenThousand;
+
+                const blocks = [];
+                for(let i=0; i<currentVal; i++) {
+                    blocks.push(<BlockComponent key={i} />);
+                }
+
+                // Render in a grid/flex container to keep it tidy
+                return (
+                    <div className="flex flex-wrap gap-1 justify-center content-start min-h-[100px] max-h-[150px] overflow-y-auto p-1 bg-slate-800/50 rounded">
+                        {blocks.length > 0 ? blocks : <span className="text-slate-600 text-xs mt-4">0</span>}
+                    </div>
+                );
+            };
+
+            return (
+                <div className="w-full bg-slate-900 p-4 sm:p-6 rounded-xl shadow-inner border border-slate-700">
+                    
+                    {/* Controls */}
+                    {!readOnly && (
+                        <div className="flex justify-between items-center mb-6">
+                            <div className="flex gap-2">
+                                <button onClick={handleUndo} disabled={history.length <= 1} className="p-2 bg-slate-700 hover:bg-slate-600 disabled:opacity-50 rounded-lg transition-colors" title="Undo Last Exchange">
+                                    {ICONS.undo}
+                                </button>
+                                <button onClick={handleReset} className="p-2 bg-slate-700 hover:bg-slate-600 rounded-lg transition-colors" title="Reset Problem">
+                                    {ICONS.refresh}
+                                </button>
+                            </div>
+                            <div className="text-cyan-400 font-bold display-font tracking-wider">
+                                {minuend} - {subtrahend}
+                            </div>
+                        </div>
+                    )}
+
+                    {/* Feedback Area */}
+                    {(feedback || hintMessage) && (
+                        <div className={`mb-6 p-4 rounded-lg border flex items-start gap-3 ${
+                            feedback?.type === 'error' ? 'bg-orange-950/50 border-orange-500/50 text-orange-200' :
+                            feedback?.type === 'success' ? 'bg-green-950/50 border-green-500/50 text-green-200' :
+                            'bg-cyan-950/50 border-cyan-500/50 text-cyan-200'
+                        }`}>
+                            <ZeroX emotion={feedback?.type === 'error' ? 'shock' : feedback?.type === 'success' ? 'happy' : 'thinking'} size="small" />
+                            <div className="flex-1 pt-1 font-medium">
+                                {feedback?.msg || hintMessage}
+                            </div>
+                        </div>
+                    )}
+
+                    {/* Workspace Grid */}
+                    <div className="flex justify-center w-full overflow-x-auto pb-4">
+                        <div className="flex gap-1 sm:gap-4 relative items-end">
+                            {/* Operator Sign */}
+                            <div className="absolute left-[-2rem] bottom-[4.5rem] text-3xl font-bold text-slate-400">-</div>
+
+                            {columns.map((col, idx) => (
+                                <div key={col.id} className="flex flex-col items-center min-w-[60px] sm:min-w-[80px]">
+                                    
+                                    {/* Visual Blocks (if mode is model or mixed) */}
+                                    {mode !== 'algorithm' && (
+                                        <div className="mb-4 w-full">
+                                            <div className="text-[10px] sm:text-xs text-center text-slate-400 uppercase tracking-wider mb-2 h-8 flex items-end justify-center">
+                                                {col.name}
+                                            </div>
+                                            {renderBlocks(col, idx)}
+                                        </div>
+                                    )}
+
+                                    {/* Regrouping Button Area (between columns) */}
+                                    {!readOnly && idx < columns.length - 1 && (
+                                        <div className="absolute h-8" style={{ right: `calc(${((columns.length - 1 - idx) / columns.length) * 100}% - 1.5rem)`, top: mode==='algorithm'? '4rem' : '10rem', zIndex: 10 }}>
+                                            <button 
+                                                onClick={() => handleRegroup(idx)}
+                                                className={`text-xs bg-cyan-600 hover:bg-cyan-500 text-white rounded px-2 py-1 shadow-lg transform transition active:scale-90 ${col.topHistory[col.topHistory.length-1] === 0 ? 'opacity-50 cursor-not-allowed bg-slate-600' : ''}`}
+                                                title={`Exchange 1 ${col.name} for 10 ${columns[idx+1].name}`}
+                                            >
+                                                &#8594;
+                                            </button>
+                                        </div>
+                                    )}
+
+                                    {/* Algorithm View: Top Row (Regrouping History) */}
+                                    <div className="flex flex-col items-center justify-end h-24 sm:h-32 w-full border-b-2 border-slate-600 pb-2">
+                                        {col.topHistory.map((val, hIdx) => {
+                                            const isLast = hIdx === col.topHistory.length - 1;
+                                            return (
+                                                <div 
+                                                    key={hIdx} 
+                                                    className={`text-xl sm:text-3xl font-bold display-font transition-all duration-300 ${isLast ? 'text-cyan-400 scale-110' : 'text-slate-500 strike-anim scale-90'}`}
+                                                >
+                                                    {val}
+                                                </div>
+                                            )
+                                        })}
+                                    </div>
+
+                                    {/* Algorithm View: Subtrahend */}
+                                    <div className="text-xl sm:text-3xl font-bold display-font text-slate-300 mt-4 mb-4">
+                                        {col.subtrahend}
+                                    </div>
+
+                                    {/* Input Area */}
+                                    <input 
+                                        type="text" 
+                                        maxLength="1"
+                                        disabled={readOnly}
+                                        value={col.userInput}
+                                        onChange={(e) => handleInputChange(idx, e.target.value.replace(/[^0-9]/g, ''))}
+                                        className={`w-12 h-12 sm:w-16 sm:h-16 text-center text-xl sm:text-3xl font-bold rounded-lg border-2 bg-slate-800 focus:outline-none focus:border-cyan-400 transition-colors ${readOnly ? 'border-slate-700 text-slate-400' : 'border-slate-600 text-white'}`}
+                                    />
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+
+                    {!readOnly && (
+                        <div className="mt-8 flex justify-end">
+                            <button 
+                                onClick={checkAnswer}
+                                className="bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-400 hover:to-emerald-500 text-white font-bold py-3 px-8 rounded-xl shadow-[0_0_15px_rgba(34,197,94,0.4)] transform transition hover:-translate-y-1 active:translate-y-0 text-lg display-font tracking-wide"
+                            >
+                                CHECK ANSWER
+                            </button>
+                        </div>
+                    )}
+                </div>
+            );
+        };
+
+        const LevelLayout = ({ levelId, onBack, children, xp, characterEmotion = 'normal', promptText }) => {
+            const levelInfo = LEVELS.find(l => l.id === levelId);
+            return (
+                <div className="min-h-screen flex flex-col p-4 md:p-8 max-w-7xl mx-auto">
+                    {/* Header */}
+                    <div className="flex justify-between items-center mb-6 bg-slate-800 p-4 rounded-2xl shadow-lg border border-slate-700">
+                        <button onClick={onBack} className="flex items-center gap-2 text-slate-400 hover:text-white transition-colors">
+                            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"></path></svg>
+                            <span className="hidden sm:inline font-semibold uppercase tracking-wider text-sm">Mission Map</span>
+                        </button>
+                        <div className="text-center">
+                            <h2 className="text-xl md:text-2xl font-bold display-font text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 to-blue-500 uppercase tracking-widest">
+                                {levelInfo?.title || 'Mission'}
+                            </h2>
+                            <p className="text-xs md:text-sm text-slate-400">{levelInfo?.desc}</p>
+                        </div>
+                        <div className="flex items-center gap-2 bg-slate-900 px-4 py-2 rounded-xl border border-slate-700 shadow-inner">
+                            <span className="text-yellow-400 font-bold display-font text-lg md:text-xl">{xp}</span>
+                            <span className="text-slate-500 font-bold text-xs">XP</span>
+                        </div>
+                    </div>
+
+                    {/* Main Content Area - Two Panel Layout */}
+                    <div className="flex-1 flex flex-col lg:flex-row gap-6">
+                        {/* Left Panel: Dialog & Instructions */}
+                        <div className="lg:w-1/3 flex flex-col gap-6">
+                            <div className="bg-slate-800 p-6 rounded-2xl shadow-lg border border-slate-700 flex flex-col items-center text-center">
+                                <ZeroX emotion={characterEmotion} />
+                                <h3 className="mt-4 font-bold text-lg text-cyan-400 display-font">ZERO-X</h3>
+                                <div className="mt-4 text-slate-200 text-lg leading-relaxed bg-slate-900 p-4 rounded-xl shadow-inner w-full text-left relative">
+                                    {/* Speech bubble tail */}
+                                    <div className="absolute -top-3 left-1/2 transform -translate-x-1/2 w-0 h-0 border-l-[10px] border-l-transparent border-r-[10px] border-r-transparent border-b-[12px] border-b-slate-900"></div>
+                                    {promptText}
+                                </div>
+                            </div>
+                            
+                            {/* Generic controls slot if needed */}
+                            <div id="left-controls-slot"></div>
+                        </div>
+
+                        {/* Right Panel: Workspace */}
+                        <div className="lg:w-2/3 flex flex-col">
+                            {children}
+                        </div>
+                    </div>
+                </div>
+            );
+        };
+
+        
+        // --- TRAINING LAB ---
+        const TrainingLab = ({ onComplete, xp, onBack }) => {
+            const [step, setStep] = useState(0);
+            
+            const handleSolve = (success) => {
+                if(success) setStep(1);
+            };
+
+            const prompts = [
+                <span key="1">Welcome, recruit. Our system is jammed. We need to calculate <strong>6,000 - 4,678</strong>. <br/><br/>Look at the Ones column. Can you subtract 8 ones when you have 0 ones? You must <strong>Regroup</strong> using the <span className="text-cyan-400 bg-slate-800 px-1 rounded">&#8594;</span> buttons starting from the Thousands!</span>,
+                <span key="2">Excellent! The Regrouping Machine is online. <br/><br/><strong>Question:</strong> Why did we have to start regrouping from the Thousands place instead of the Hundreds?</span>
+            ];
+
+            return (
+                <LevelLayout levelId="training" onBack={onBack} xp={xp} promptText={prompts[step]} characterEmotion={step===1 ? 'happy' : 'normal'}>
+                    {step === 0 ? (
+                        <SubtractionWorkspace minuend={6000} subtrahend={4678} mode="model" onSolve={handleSolve} />
+                    ) : (
+                        <div className="bg-slate-800 p-8 rounded-2xl border border-slate-700 h-full flex flex-col justify-center animate-fadeIn">
+                            <h3 className="text-2xl font-bold text-white mb-6 display-font">Knowledge Check</h3>
+                            <div className="space-y-4">
+                                <button onClick={() => {}} className="w-full text-left p-4 rounded-xl bg-slate-900 border border-slate-700 hover:border-red-500 hover:bg-red-900/20 transition-colors text-slate-300">
+                                    A. Because thousands are bigger than hundreds.
+                                </button>
+                                <button onClick={() => onComplete(50)} className="w-full text-left p-4 rounded-xl bg-slate-900 border border-slate-700 hover:border-green-500 hover:bg-green-900/20 transition-colors text-slate-300 group">
+                                    <span className="group-hover:text-white transition-colors">B. Because both the Tens and Hundreds places had 0 units, so we had to move left until we found a place with value to exchange.</span>
+                                </button>
+                            </div>
+                        </div>
+                    )}
+                </LevelLayout>
+            );
+        };
+
+        // --- LEVEL 1: Break the Zero ---
+        const Level1 = ({ onComplete, xp, onBack }) => {
+            const handleSolve = (success) => { if(success) setTimeout(() => onComplete(100), 2000); };
+            return (
+                <LevelLayout levelId="level1" onBack={onBack} xp={xp} promptText="The power station is failing! Fix the sequence: 4,305 - 1,178. There is one zero in the way. Exchange carefully!">
+                    <SubtractionWorkspace minuend={4305} subtrahend={1178} mode="model" onSolve={handleSolve} />
+                </LevelLayout>
+            );
+        };
+
+        // --- LEVEL 2: Zero Chain ---
+        const Level2 = ({ onComplete, xp, onBack }) => {
+            const [qIndex, setQIndex] = useState(0);
+            const questions = [{ m: 20004, s: 8756 }, { m: 50030, s: 27865 }];
+            
+            const handleSolve = (success) => { 
+                if(success) {
+                    if(qIndex < questions.length - 1) setTimeout(() => setQIndex(qIndex + 1), 2000);
+                    else setTimeout(() => onComplete(150), 2000);
+                }
+            };
+            return (
+                <LevelLayout levelId="level2" onBack={onBack} xp={xp} promptText={`We must cross the Zero Bridge. Problem ${qIndex+1} of 2. Notice the consecutive zeros! Where is the first place you can find enough units to regroup?`}>
+                    <SubtractionWorkspace key={qIndex} minuend={questions[qIndex].m} subtrahend={questions[qIndex].s} mode="mixed" onSolve={handleSolve} />
+                </LevelLayout>
+            );
+        };
+
+        // --- LEVEL 3: Algorithm Arena ---
+        const Level3 = ({ onComplete, xp, onBack }) => {
+            const handleSolve = (success) => { if(success) setTimeout(() => onComplete(150), 2000); };
+            return (
+                <LevelLayout levelId="level3" onBack={onBack} xp={xp} promptText="You are entering the Algorithm Arena. The visual blocks are minimized. Rely on the numbers and crossed-out values to record your exchanges!">
+                    <SubtractionWorkspace minuend={76003} subtrahend={28947} mode="algorithm" onSolve={handleSolve} />
+                </LevelLayout>
+            );
+        };
+
+        // --- LEVEL 4: Error Hunters ---
+        const Level4 = ({ onComplete, xp, onBack }) => {
+            const [stage, setStage] = useState('analyze'); // analyze, fix
+            
+            const ErrorImage = () => (
+                <div className="bg-slate-900 p-6 rounded-xl font-mono text-2xl tracking-widest text-center border-2 border-red-500/50 shadow-[0_0_20px_rgba(239,68,68,0.2)]">
+                    <div className="text-slate-500 text-sm mb-4 tracking-normal">LOG ENTRY #004 - FAILED CALCULATION</div>
+                    <div className="flex justify-center gap-6 mb-2">
+                         <span></span><span className="text-red-400 strike-anim">8</span><span className="text-red-400">10</span><span className="text-red-400">10</span>
+                    </div>
+                    <div className="flex justify-center gap-6">
+                        <span></span><span>8</span><span>0</span><span>0</span>
+                    </div>
+                    <div className="flex justify-center gap-6 border-b-2 border-slate-600 pb-2 mb-2">
+                        <span>-</span><span>3</span><span>4</span><span>7</span>
+                    </div>
+                    <div className="flex justify-center gap-6 text-red-400 font-bold">
+                        <span></span><span>5</span><span>6</span><span>3</span>
+                    </div>
+                </div>
+            );
+
+            return (
+                <LevelLayout levelId="level4" onBack={onBack} xp={xp} promptText={stage === 'analyze' ? "I found a glitched solution! Someone tried to solve 800 - 347. Look closely at their regrouping at the top. What did they do wrong?" : "Good eye! They changed the 0 in the Tens place to a 10, but didn't actually exchange anything from the Hundreds! Now, you solve it correctly."} characterEmotion={stage === 'analyze' ? 'shock' : 'happy'}>
+                    
+                    {stage === 'analyze' ? (
+                        <div className="flex flex-col gap-6">
+                            <ErrorImage />
+                            <div className="bg-slate-800 p-6 rounded-xl border border-slate-700">
+                                <h4 className="font-bold mb-4 text-cyan-400 display-font">Identify the Error:</h4>
+                                <div className="space-y-3 text-sm">
+                                    <button className="w-full text-left p-3 rounded bg-slate-900 border border-slate-700 hover:border-red-500 text-slate-300">They subtracted the smaller digit from the larger digit in the bottom row.</button>
+                                    <button onClick={() => setStage('fix')} className="w-full text-left p-3 rounded bg-slate-900 border border-slate-700 hover:border-green-500 text-slate-300 group"><span className="group-hover:text-white">They wrote '10' over the Tens and Ones without decreasing the place to the left (Hundreds). Units were created from nothing!</span></button>
+                                    <button className="w-full text-left p-3 rounded bg-slate-900 border border-slate-700 hover:border-red-500 text-slate-300">They subtracted 3 from 8 incorrectly.</button>
+                                </div>
+                            </div>
+                        </div>
+                    ) : (
+                        <SubtractionWorkspace minuend={800} subtrahend={347} mode="algorithm" onSolve={(s) => { if(s) setTimeout(()=>onComplete(200), 2000);}} />
+                    )}
+                </LevelLayout>
+            );
+        };
+
+        // --- LEVEL 5: Strategy Masters ---
+        const Level5 = ({ onComplete, xp, onBack }) => {
+            const [step, setStep] = useState(0);
+
+            const promptText = step === 0 ? "Let's compare strategies for 6,000 - 4,678. \nStrategy A: Standard Algorithm with Regrouping.\nStrategy B: Compensation." 
+                : "Look at Strategy B (Compensation). We subtracted 1 from BOTH the top and bottom numbers. Why does this make it easier?";
+
+            return (
+                <LevelLayout levelId="level5" onBack={onBack} xp={xp} promptText={promptText} characterEmotion="thinking">
+                    {step === 0 ? (
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 h-full">
+                            <div className="bg-slate-800 p-6 rounded-xl border border-slate-700 flex flex-col justify-between">
+                                <h3 className="font-bold text-orange-400 display-font text-center mb-4">Strategy A</h3>
+                                <div className="text-center font-mono text-2xl tracking-widest leading-loose flex-1 flex flex-col justify-center">
+                                    <div className="text-slate-400 text-sm">5 9 9 10</div>
+                                    <div>6 0 0 0</div>
+                                    <div className="border-b-2 border-slate-600">- 4 6 7 8</div>
+                                    <div className="text-cyan-400 font-bold mt-2">1 3 2 2</div>
+                                </div>
+                            </div>
+                            <div className="bg-slate-800 p-6 rounded-xl border border-slate-700 flex flex-col justify-between relative overflow-hidden">
+                                <div className="absolute top-0 right-0 bg-green-600 text-white text-xs font-bold px-3 py-1 rounded-bl-lg">NEW</div>
+                                <h3 className="font-bold text-green-400 display-font text-center mb-4">Strategy B: Compensation</h3>
+                                <div className="text-center font-mono text-xl tracking-widest leading-loose flex-1 flex flex-col justify-center text-slate-300">
+                                    <div className="flex justify-center items-center gap-4">
+                                        <div>6 0 0 0</div>
+                                        <div className="text-green-400 text-sm">- 1 &rarr;</div>
+                                        <div className="text-white">5 9 9 9</div>
+                                    </div>
+                                    <div className="flex justify-center items-center gap-4 border-b-2 border-slate-600 pb-2">
+                                        <div>- 4 6 7 8</div>
+                                        <div className="text-green-400 text-sm">- 1 &rarr;</div>
+                                        <div className="text-white">- 4 6 7 7</div>
+                                    </div>
+                                    <div className="flex justify-center items-center gap-4 mt-2">
+                                        <div className="opacity-0">1 3 2 2</div>
+                                        <div className="opacity-0 w-8"></div>
+                                        <div className="text-cyan-400 font-bold">1 3 2 2</div>
+                                    </div>
+                                </div>
+                            </div>
+                            <div className="md:col-span-2 flex justify-end">
+                                <button onClick={() => setStep(1)} className="bg-cyan-600 hover:bg-cyan-500 text-white px-6 py-3 rounded-xl font-bold display-font">Analyze &rarr;</button>
+                            </div>
+                        </div>
+                    ) : (
+                        <div className="bg-slate-800 p-8 rounded-2xl border border-slate-700 h-full flex flex-col justify-center">
+                            <h3 className="text-2xl font-bold text-white mb-6 display-font">Why Compensation Works</h3>
+                            <div className="space-y-4">
+                                <button className="w-full text-left p-4 rounded-xl bg-slate-900 border border-slate-700 hover:border-red-500 text-slate-300">
+                                    It changes the answer but makes the math faster.
+                                </button>
+                                <button onClick={() => onComplete(200)} className="w-full text-left p-4 rounded-xl bg-slate-900 border border-slate-700 hover:border-green-500 text-slate-300 group">
+                                    <span className="group-hover:text-white">Subtracting 1 from both numbers keeps the *difference* between them the same, but changes the top number to 9s, eliminating the need to regroup!</span>
+                                </button>
+                                <button className="w-full text-left p-4 rounded-xl bg-slate-900 border border-slate-700 hover:border-red-500 text-slate-300">
+                                    It's a trick that only works with the number 6,000.
+                                </button>
+                            </div>
+                        </div>
+                    )}
+                </LevelLayout>
+            );
+        };
+
+        // --- LEVEL 6: Final Boss (Create & Prove) ---
+        const Level6 = ({ onComplete, xp, onBack }) => {
+            const [bossStep, setBossStep] = useState(0); // 0: input, 1: solve
+            const [customM, setCustomM] = useState('');
+            const [customS, setCustomS] = useState('');
+            const [error, setError] = useState('');
+
+            const validateCustomProblem = () => {
+                setError('');
+                const m = parseInt(customM, 10);
+                const s = parseInt(customS, 10);
+
+                if(isNaN(m) || isNaN(s)) return setError("Enter valid whole numbers.");
+                if(s >= m) return setError("The top number (minuend) must be greater than the bottom number.");
+                if(!customM.includes('00')) return setError("The top number must contain at least two consecutive zeros (e.g., 5003).");
+                
+                // Mathematical check for regrouping requirement over the zeros
+                const mDigits = getDigits(m, Math.max(customM.length, customS.length));
+                const sDigits = getDigits(s, Math.max(customM.length, customS.length));
+                let requiresRegroupingAcrossZeros = false;
+                
+                for(let i=0; i<mDigits.length; i++) {
+                    if(mDigits[i] === 0 && mDigits[i-1] === 0) { // Found consecutive zeros
+                        // Check if subtraction in or to the right of these zeros requires regrouping
+                        // Simplified check: If any digit below the zeros or to their right is > top digit
+                        for(let j=i; j<mDigits.length; j++) {
+                            if(sDigits[j] > mDigits[j]) requiresRegroupingAcrossZeros = true;
+                        }
+                    }
+                }
+
+                if(!requiresRegroupingAcrossZeros) return setError("Make sure your bottom number is large enough to force regrouping across those zeros!");
+
+                setBossStep(1);
+            };
+
+            return (
+                <LevelLayout levelId="level6" onBack={onBack} xp={xp} promptText={bossStep === 0 ? "FINAL BOSS: CREATE YOUR OWN CHALLENGE.\n\nDesign a subtraction problem that meets the conditions on the right. If it passes validation, you must solve it to prove your mastery!" : "Excellent design. Now, activate the engine and solve your own creation."} characterEmotion="normal">
+                    
+                    {bossStep === 0 ? (
+                        <div className="bg-slate-800 p-6 md:p-8 rounded-2xl border-2 border-purple-500 shadow-[0_0_30px_rgba(168,85,247,0.3)] flex flex-col h-full">
+                            <h3 className="font-bold text-2xl text-purple-400 display-font mb-6">The Zero Vault Architecture</h3>
+                            
+                            <ul className="space-y-3 text-slate-300 mb-8 list-disc pl-5">
+                                <li>Both numbers must be whole numbers.</li>
+                                <li>Top number must be larger.</li>
+                                <li>Top number must contain at least <strong className="text-white">two consecutive zeros</strong>.</li>
+                                <li>The problem must require regrouping across those zeros.</li>
+                            </ul>
+
+                            <div className="flex-1 flex flex-col items-center justify-center gap-4">
+                                <div className="flex items-center gap-4">
+                                    <span className="text-xl font-bold text-slate-400 w-32 text-right">Top Number:</span>
+                                    <input type="text" value={customM} onChange={e=>setCustomM(e.target.value.replace(/[^0-9]/g,''))} maxLength="6" className="w-48 text-3xl p-3 bg-slate-900 border-2 border-slate-600 rounded-xl text-white font-mono text-center focus:border-purple-500 focus:outline-none" placeholder="e.g. 5000" />
+                                </div>
+                                <div className="flex items-center gap-4 mb-4">
+                                    <span className="text-xl font-bold text-slate-400 w-32 text-right">Bottom Number:</span>
+                                    <input type="text" value={customS} onChange={e=>setCustomS(e.target.value.replace(/[^0-9]/g,''))} maxLength="6" className="w-48 text-3xl p-3 bg-slate-900 border-2 border-slate-600 rounded-xl text-white font-mono text-center focus:border-purple-500 focus:outline-none" placeholder="e.g. 2345" />
+                                </div>
+                                
+                                {error && <div className="text-orange-400 bg-orange-950/50 p-3 rounded-lg border border-orange-500/50 w-full max-w-md text-center">{error}</div>}
+                                
+                                <button onClick={validateCustomProblem} className="mt-4 bg-purple-600 hover:bg-purple-500 text-white font-bold py-3 px-8 rounded-xl shadow-[0_0_15px_rgba(168,85,247,0.4)] transition-all display-font text-lg">VALIDATE DESIGN</button>
+                            </div>
+                        </div>
+                    ) : (
+                        <SubtractionWorkspace minuend={parseInt(customM)} subtrahend={parseInt(customS)} mode="algorithm" onSolve={(s) => { if(s) setTimeout(()=>onComplete(500), 2000);}} />
+                    )}
+
+                </LevelLayout>
+            );
+        };
+
+
+        const MapScreen = ({ unlocked, onSelectLevel, xp }) => {
+            return (
+                <div className="min-h-screen relative overflow-hidden flex flex-col items-center py-12 px-4">
+                    {/* Background grid/stars */}
+                    <div className="absolute inset-0 opacity-20 pointer-events-none" style={{ backgroundImage: 'radial-gradient(circle at 2px 2px, white 1px, transparent 0)', backgroundSize: '40px 40px' }}></div>
+                    
+                    <div className="w-full max-w-4xl flex justify-between items-center mb-12 z-10 bg-slate-800/80 backdrop-blur p-4 rounded-2xl border border-slate-700">
+                        <div className="flex items-center gap-4">
+                            <ZeroX emotion="happy" size="small" />
+                            <div>
+                                <h1 className="text-2xl font-bold display-font text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 to-blue-500">MISSION MAP</h1>
+                                <p className="text-slate-400 text-sm">Select your next destination.</p>
+                            </div>
+                        </div>
+                        <div className="flex flex-col items-end">
+                            <span className="text-slate-400 text-sm font-bold tracking-widest uppercase">Total XP</span>
+                            <span className="text-3xl font-bold text-yellow-400 display-font">{xp}</span>
+                        </div>
+                    </div>
+
+                    <div className="relative w-full max-w-3xl flex-1 flex flex-col items-center justify-center gap-6 z-10">
+                        {/* Connecting Path (simplified SVG behind buttons) */}
+                        <svg className="absolute inset-0 w-full h-full pointer-events-none" style={{ zIndex: -1 }}>
+                            <path d="M 50% 10% L 50% 90%" stroke="#334155" strokeWidth="4" strokeDasharray="10 10" className="path-dash" fill="none" />
+                        </svg>
+
+                        {LEVELS.map((level, index) => {
+                            const isUnlocked = unlocked.includes(level.id);
+                            const isCompleted = unlocked.includes(LEVELS[index+1]?.id) || (level.id==='level6' && unlocked.includes('certificate'));
+                            
+                            let bgClass = isUnlocked ? 'bg-slate-800 border-cyan-500 shadow-[0_0_15px_rgba(6,182,212,0.3)] hover:bg-slate-700' : 'bg-slate-900 border-slate-700 opacity-60 cursor-not-allowed';
+                            if (level.id === 'level6' && isUnlocked) bgClass = 'bg-slate-800 border-purple-500 shadow-[0_0_20px_rgba(168,85,247,0.5)] hover:bg-slate-700';
+
+                            return (
+                                <button 
+                                    key={level.id}
+                                    disabled={!isUnlocked}
+                                    onClick={() => onSelectLevel(level.id)}
+                                    className={`relative w-full max-w-md p-4 rounded-2xl border-2 transition-all duration-300 transform ${isUnlocked ? 'hover:scale-105 active:scale-95' : ''} ${bgClass} flex items-center justify-between`}
+                                >
+                                    <div className="flex flex-col items-start text-left">
+                                        <span className={`text-xs font-bold tracking-wider uppercase mb-1 ${level.id === 'level6' ? 'text-purple-400' : 'text-cyan-400'}`}>Mission {index}</span>
+                                        <span className="text-lg font-bold text-white display-font">{level.title}</span>
+                                    </div>
+                                    <div className="w-12 h-12 rounded-full flex items-center justify-center bg-slate-900 border border-slate-700">
+                                        {isCompleted ? ICONS.check : (isUnlocked ? ICONS.arrowRight : ICONS.lock)}
+                                    </div>
+                                </button>
+                            );
+                        })}
+
+                        {unlocked.includes('certificate') && (
+                            <button onClick={() => onSelectLevel('certificate')} className="mt-8 bg-gradient-to-r from-yellow-500 to-orange-500 p-1 rounded-2xl shadow-[0_0_30px_rgba(245,158,11,0.5)] transform hover:scale-105 transition-all">
+                                <div className="bg-slate-900 px-8 py-4 rounded-xl flex items-center gap-4">
+                                    {ICONS.star}
+                                    <span className="font-bold text-lg display-font text-white tracking-widest">VIEW CERTIFICATE</span>
+                                    {ICONS.star}
+                                </div>
+                            </button>
+                        )}
+                    </div>
+                </div>
+            );
+        };
+
+
+        const CertificateView = ({ studentName, date, onBack }) => {
+            return (
+                <div className="min-h-screen flex flex-col items-center justify-center p-4">
+                    <div className="mb-8 flex gap-4 no-print">
+                        <button onClick={onBack} className="bg-slate-800 hover:bg-slate-700 text-white font-bold py-2 px-6 rounded-lg border border-slate-600 transition-colors">
+                            Return to Map
+                        </button>
+                        <button onClick={() => window.print()} className="bg-cyan-600 hover:bg-cyan-500 text-white font-bold py-2 px-6 rounded-lg shadow-[0_0_15px_rgba(6,182,212,0.4)] transition-all">
+                            Print / Save PDF
+                        </button>
+                    </div>
+
+                    {/* Certificate Print Area */}
+                    <div id="certificate-area" className="w-[1000px] h-[700px] bg-slate-50 relative border-[16px] border-slate-800 p-12 flex flex-col items-center justify-center shadow-2xl overflow-hidden print:w-[100%] print:h-[100vh] print:border-8">
+                        
+                        {/* Decorative corners */}
+                        <div className="absolute top-0 left-0 w-32 h-32 border-b-8 border-r-8 border-cyan-500 rounded-br-3xl"></div>
+                        <div className="absolute top-0 right-0 w-32 h-32 border-b-8 border-l-8 border-cyan-500 rounded-bl-3xl"></div>
+                        <div className="absolute bottom-0 left-0 w-32 h-32 border-t-8 border-r-8 border-cyan-500 rounded-tr-3xl"></div>
+                        <div className="absolute bottom-0 right-0 w-32 h-32 border-t-8 border-l-8 border-cyan-500 rounded-tl-3xl"></div>
+
+                        {/* Watermark */}
+                        <div className="absolute inset-0 opacity-5 flex items-center justify-center pointer-events-none">
+                            <svg viewBox="0 0 100 100" className="w-2/3 h-2/3"><polygon points="50,10 90,90 10,90" fill="currentColor"/></svg>
+                        </div>
+
+                        <div className="z-10 text-center flex flex-col items-center w-full">
+                            <h4 className="text-cyan-600 font-bold tracking-[0.3em] uppercase mb-4 display-font">Zero Breakers</h4>
+                            <h1 className="text-6xl font-black text-slate-800 mb-2 display-font" style={{ fontFamily: 'Georgia, serif' }}>CERTIFICATE OF MASTERY</h1>
+                            <div className="w-64 h-1 bg-gradient-to-r from-transparent via-orange-500 to-transparent mb-8"></div>
+                            
+                            <h2 className="text-3xl text-slate-600 font-bold tracking-widest uppercase mb-12">Master of Regrouping</h2>
+                            
+                            <p className="text-xl text-slate-500 italic mb-4">This certificate is proudly awarded to:</p>
+                            
+                            <div className="text-5xl font-bold text-slate-800 border-b-2 border-slate-300 pb-2 mb-8 min-w-[400px] text-center" style={{ fontFamily: 'Georgia, serif' }}>
+                                {studentName || 'Student Name'}
+                            </div>
+                            
+                            <p className="text-lg text-slate-600 max-w-2xl leading-relaxed mb-16">
+                                For demonstrating exceptional mathematical understanding of subtraction across zeros through precise modeling, accurate regrouping, logical reasoning, error analysis, and independent problem-solving.
+                            </p>
+                            
+                            <div className="flex justify-between w-full px-16">
+                                <div className="flex flex-col items-center">
+                                    <div className="w-48 border-b-2 border-slate-800 pb-2 text-center text-lg font-bold text-slate-700">Maha Eldardiry</div>
+                                    <div className="text-sm text-slate-500 uppercase tracking-wider mt-2">Grade 4 Math Teacher</div>
+                                </div>
+                                
+                                <div className="flex flex-col items-center justify-center w-24 h-24 rounded-full border-4 border-yellow-500 text-yellow-600 font-bold rotate-12 relative -top-6">
+                                    <span className="text-xs">CCSS</span>
+                                    <span className="text-lg">4.NBT.4</span>
+                                </div>
+
+                                <div className="flex flex-col items-center">
+                                    <div className="w-48 border-b-2 border-slate-800 pb-2 text-center text-lg font-bold text-slate-700">{date}</div>
+                                    <div className="text-sm text-slate-500 uppercase tracking-wider mt-2">Date of Completion</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            );
+        };
+
+
+        const App = () => {
+            const [view, setView] = useState('start'); // start, map, training, level1... certificate
+            const [studentName, setStudentName] = useState('');
+            const [unlocked, setUnlocked] = useState(['training']);
+            const [xp, setXp] = useState(0);
+            const [animatingXp, setAnimatingXp] = useState(null);
+
+            const handleStart = (e) => {
+                e.preventDefault();
+                if(studentName.trim().length > 0) setView('map');
+            };
+
+            const awardXP = (amount, nextLevelId) => {
+                setAnimatingXp(amount);
+                setTimeout(() => {
+                    setXp(prev => prev + amount);
+                    setAnimatingXp(null);
+                    if(nextLevelId && !unlocked.includes(nextLevelId)) {
+                        setUnlocked(prev => [...prev, nextLevelId]);
+                    }
+                    setView('map');
+                }, 1500); // Wait for animations to finish before returning to map
+            };
+
+            // Floating XP Animation Overlay
+            const XpAnimation = () => {
+                if(!animatingXp) return null;
+                return (
+                    <div className="fixed inset-0 flex items-center justify-center z-50 bg-slate-900/80 backdrop-blur-sm transition-all duration-300">
+                        <div className="text-center animate-bounce">
+                            <h2 className="text-4xl font-bold text-white mb-4 display-font">MISSION ACCOMPLISHED</h2>
+                            <div className="text-6xl font-black text-yellow-400 drop-shadow-[0_0_20px_rgba(250,204,21,0.8)]">
+                                +{animatingXp} XP
+                            </div>
+                        </div>
+                    </div>
+                );
+            };
+
+            if (view === 'start') {
+                return (
+                    <div className="min-h-screen flex flex-col items-center justify-center p-4 relative overflow-hidden">
+                        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[800px] h-[800px] bg-cyan-900/20 rounded-full blur-[100px] pointer-events-none"></div>
+                        
+                        <div className="z-10 flex flex-col items-center text-center max-w-lg w-full">
+                            <ZeroX emotion="happy" size="large" />
+                            <h1 className="mt-8 text-4xl md:text-6xl font-black text-transparent bg-clip-text bg-gradient-to-br from-cyan-300 via-blue-500 to-purple-600 display-font tracking-tight drop-shadow-lg">
+                                ZERO BREAKERS
+                            </h1>
+                            <h2 className="text-xl text-cyan-400 font-bold tracking-[0.2em] mt-2 mb-8 uppercase">The Regrouping Quest</h2>
+                            
+                            <form onSubmit={handleStart} className="w-full bg-slate-800/80 backdrop-blur p-8 rounded-2xl border border-slate-700 shadow-2xl flex flex-col gap-4">
+                                <label className="text-slate-300 font-semibold text-left">Enter Recruit Name:</label>
+                                <input 
+                                    type="text" 
+                                    required
+                                    value={studentName}
+                                    onChange={e => setStudentName(e.target.value)}
+                                    placeholder="Your First Name"
+                                    className="w-full text-2xl p-4 bg-slate-900 border-2 border-slate-600 rounded-xl text-white focus:border-cyan-400 focus:outline-none transition-colors"
+                                />
+                                <button type="submit" className="w-full mt-4 bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-500 hover:to-blue-500 text-white font-bold py-4 rounded-xl text-xl shadow-[0_0_20px_rgba(6,182,212,0.4)] transform hover:-translate-y-1 transition-all display-font">
+                                    INITIATE SEQUENCE
+                                </button>
+                            </form>
+                        </div>
+                    </div>
+                );
+            }
+
+            if (view === 'map') return <MapScreen unlocked={unlocked} onSelectLevel={setView} xp={xp} />;
+            if (view === 'certificate') return <CertificateView studentName={studentName} date={new Date().toLocaleDateString()} onBack={() => setView('map')} />;
+
+            // Render active level dynamically
+            return (
+                <>
+                    <XpAnimation />
+                    {view === 'training' && <TrainingLab xp={xp} onBack={() => setView('map')} onComplete={(pts) => awardXP(pts, 'level1')} />}
+                    {view === 'level1' && <Level1 xp={xp} onBack={() => setView('map')} onComplete={(pts) => awardXP(pts, 'level2')} />}
+                    {view === 'level2' && <Level2 xp={xp} onBack={() => setView('map')} onComplete={(pts) => awardXP(pts, 'level3')} />}
+                    {view === 'level3' && <Level3 xp={xp} onBack={() => setView('map')} onComplete={(pts) => awardXP(pts, 'level4')} />}
+                    {view === 'level4' && <Level4 xp={xp} onBack={() => setView('map')} onComplete={(pts) => awardXP(pts, 'level5')} />}
+                    {view === 'level5' && <Level5 xp={xp} onBack={() => setView('map')} onComplete={(pts) => awardXP(pts, 'level6')} />}
+                    {view === 'level6' && <Level6 xp={xp} onBack={() => setView('map')} onComplete={(pts) => awardXP(pts, 'certificate')} />}
+                </>
+            );
+        };
+
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<App />);
+    </script>
+</body>
+</html>
